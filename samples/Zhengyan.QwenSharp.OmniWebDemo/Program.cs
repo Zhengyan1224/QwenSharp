@@ -44,6 +44,7 @@ catch (ExternalException ex) when (IsCudaOutOfMemory(ex) && !string.Equals(demoO
 
 builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
 builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
+builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
 builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniRealtimeSessionFactory>();
 
 var app = builder.Build();

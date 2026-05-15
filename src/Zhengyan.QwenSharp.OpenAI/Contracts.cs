@@ -270,13 +270,104 @@ public sealed record OpenAIResponseResponse
     public IReadOnlyList<string> Warnings { get; init; } = Array.Empty<string>();
 }
 
+public sealed record OpenAIAudioSpeechRequest
+{
+    [JsonPropertyName("model")]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("input")]
+    public string Input { get; init; } = "";
+
+    [JsonPropertyName("voice")]
+    public string? Voice { get; init; }
+
+    [JsonPropertyName("response_format")]
+    public string ResponseFormat { get; init; } = "wav";
+
+    [JsonPropertyName("speed")]
+    public float? Speed { get; init; }
+}
+
+public sealed record OpenAIRealtimeAudioFormat(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("rate")] int? Rate = null);
+
+public sealed record OpenAIRealtimeInputAudioTranscription
+{
+    [JsonPropertyName("model")]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("language")]
+    public string? Language { get; init; }
+
+    [JsonPropertyName("prompt")]
+    public string? Prompt { get; init; }
+}
+
+public sealed record OpenAIRealtimeTurnDetection
+{
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "server_vad";
+
+    [JsonPropertyName("threshold")]
+    public float? Threshold { get; init; }
+
+    [JsonPropertyName("prefix_padding_ms")]
+    public int? PrefixPaddingMilliseconds { get; init; }
+
+    [JsonPropertyName("silence_duration_ms")]
+    public int? SilenceDurationMilliseconds { get; init; }
+
+    [JsonPropertyName("idle_timeout_ms")]
+    public int? IdleTimeoutMilliseconds { get; init; }
+}
+
+public sealed record OpenAIRealtimeSessionAudioOptions
+{
+    [JsonPropertyName("input")]
+    public OpenAIRealtimeSessionInputAudioOptions Input { get; init; } = new();
+
+    [JsonPropertyName("output")]
+    public OpenAIRealtimeSessionOutputAudioOptions Output { get; init; } = new();
+}
+
+public sealed record OpenAIRealtimeSessionInputAudioOptions
+{
+    [JsonPropertyName("format")]
+    public OpenAIRealtimeAudioFormat Format { get; init; } = new("audio/pcm", 16_000);
+
+    [JsonPropertyName("transcription")]
+    public OpenAIRealtimeInputAudioTranscription? Transcription { get; init; }
+
+    [JsonPropertyName("turn_detection")]
+    public OpenAIRealtimeTurnDetection? TurnDetection { get; init; }
+}
+
+public sealed record OpenAIRealtimeSessionOutputAudioOptions
+{
+    [JsonPropertyName("format")]
+    public OpenAIRealtimeAudioFormat Format { get; init; } = new("audio/pcm", 24_000);
+
+    [JsonPropertyName("voice")]
+    public string? Voice { get; init; }
+}
+
 public sealed record OpenAIRealtimeSessionOptions
 {
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
     [JsonPropertyName("model")]
     public string Model { get; init; } = "";
 
     [JsonPropertyName("instructions")]
     public string? Instructions { get; init; }
+
+    [JsonPropertyName("output_modalities")]
+    public IReadOnlyList<string>? OutputModalities { get; init; }
+
+    [JsonPropertyName("audio")]
+    public OpenAIRealtimeSessionAudioOptions Audio { get; init; } = new();
 
     [JsonPropertyName("voice")]
     public string? Voice { get; init; }
@@ -314,6 +405,18 @@ public sealed record OpenAIRealtimeEvent
     [JsonPropertyName("type")]
     public string Type { get; init; } = "";
 
+    [JsonPropertyName("session")]
+    public OpenAIRealtimeSessionOptions? Session { get; init; }
+
+    [JsonPropertyName("response")]
+    public OpenAIRealtimeResponseInfo? Response { get; init; }
+
+    [JsonPropertyName("item")]
+    public OpenAIRealtimeConversationItem? Item { get; init; }
+
+    [JsonPropertyName("part")]
+    public OpenAIRealtimeContentPart? Part { get; init; }
+
     [JsonPropertyName("session_id")]
     public string? SessionId { get; init; }
 
@@ -325,6 +428,9 @@ public sealed record OpenAIRealtimeEvent
 
     [JsonPropertyName("previous_item_id")]
     public string? PreviousItemId { get; init; }
+
+    [JsonPropertyName("audio")]
+    public string? Audio { get; init; }
 
     [JsonPropertyName("text")]
     public string? Text { get; init; }
@@ -387,13 +493,139 @@ public sealed record OpenAIRealtimeEvent
     public bool? Done { get; init; }
 
     [JsonPropertyName("error")]
-    public string? Error { get; init; }
+    public OpenAIRealtimeError? Error { get; init; }
 
     [JsonPropertyName("warning")]
     public string? Warning { get; init; }
 
     [JsonPropertyName("model")]
     public string? Model { get; init; }
+
+    [JsonIgnore]
+    internal string? AudioRawBase64 { get; init; }
+
+    [JsonIgnore]
+    internal OpenAIRealtimeSessionOptions? SessionRequest { get; init; }
+
+    [JsonIgnore]
+    internal OpenAIRealtimeConversationItem? ItemRequest { get; init; }
+
+    [JsonIgnore]
+    internal OpenAIRealtimeResponseRequest? ResponseRequest { get; init; }
+}
+
+public sealed record OpenAIRealtimeConversationItem
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "message";
+
+    [JsonPropertyName("status")]
+    public string? Status { get; init; } = "completed";
+
+    [JsonPropertyName("role")]
+    public string? Role { get; init; }
+
+    [JsonPropertyName("content")]
+    public IReadOnlyList<OpenAIRealtimeContentPart> Content { get; init; } = Array.Empty<OpenAIRealtimeContentPart>();
+}
+
+public sealed record OpenAIRealtimeContentPart
+{
+    [JsonPropertyName("type")]
+    public string Type { get; init; } = "text";
+
+    [JsonPropertyName("text")]
+    public string? Text { get; init; }
+
+    [JsonPropertyName("transcript")]
+    public string? Transcript { get; init; }
+
+    [JsonPropertyName("audio")]
+    public string? Audio { get; init; }
+}
+
+public sealed record OpenAIRealtimeResponseAudioOptions
+{
+    [JsonPropertyName("format")]
+    public OpenAIRealtimeAudioFormat? Format { get; init; }
+
+    [JsonPropertyName("voice")]
+    public string? Voice { get; init; }
+}
+
+public sealed record OpenAIRealtimeResponseRequest
+{
+    [JsonPropertyName("conversation")]
+    public string? Conversation { get; init; } = "auto";
+
+    [JsonPropertyName("model")]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("instructions")]
+    public string? Instructions { get; init; }
+
+    [JsonPropertyName("output_modalities")]
+    public IReadOnlyList<string>? OutputModalities { get; init; }
+
+    [JsonPropertyName("audio")]
+    public OpenAIRealtimeResponseAudioOptions? Audio { get; init; }
+
+    [JsonPropertyName("max_output_tokens")]
+    public int? MaxOutputTokens { get; init; }
+
+    [JsonPropertyName("temperature")]
+    public float? Temperature { get; init; }
+}
+
+public sealed record OpenAIRealtimeResponseInfo
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; init; }
+
+    [JsonPropertyName("output")]
+    public IReadOnlyList<OpenAIRealtimeConversationItem> Output { get; init; } = Array.Empty<OpenAIRealtimeConversationItem>();
+
+    [JsonPropertyName("conversation")]
+    public string? Conversation { get; init; }
+
+    [JsonPropertyName("model")]
+    public string? Model { get; init; }
+
+    [JsonPropertyName("instructions")]
+    public string? Instructions { get; init; }
+
+    [JsonPropertyName("output_modalities")]
+    public IReadOnlyList<string>? OutputModalities { get; init; }
+
+    [JsonPropertyName("audio")]
+    public OpenAIRealtimeResponseAudioOptions? Audio { get; init; }
+
+    [JsonPropertyName("max_output_tokens")]
+    public int? MaxOutputTokens { get; init; }
+
+    [JsonPropertyName("temperature")]
+    public float? Temperature { get; init; }
+}
+
+public sealed record OpenAIRealtimeError
+{
+    [JsonPropertyName("type")]
+    public string? Type { get; init; }
+
+    [JsonPropertyName("code")]
+    public string? Code { get; init; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; init; } = "";
+
+    [JsonPropertyName("event_id")]
+    public string? EventId { get; init; }
 }
 
 public interface IOpenAIChatCompletionsService
@@ -404,6 +636,11 @@ public interface IOpenAIChatCompletionsService
 public interface IOpenAIResponsesService
 {
     Task<OpenAIResponseResponse> CreateResponseAsync(OpenAIResponseRequest request, CancellationToken cancellationToken = default);
+}
+
+public interface IOpenAIAudioSpeechService
+{
+    Task<(byte[] AudioBytes, string ContentType)> CreateSpeechAsync(OpenAIAudioSpeechRequest request, CancellationToken cancellationToken = default);
 }
 
 public interface IOpenAIRealtimeSession : IAsyncDisposable

@@ -570,7 +570,11 @@ public sealed class Qwen25OmniRealtimeSession : IOpenAIRealtimeSession
                 Type = "error",
                 SessionId = _sessionId,
                 Text = ex.Message,
-                Error = ex.Message,
+                Error = new OpenAIRealtimeError
+                {
+                    Type = "server_error",
+                    Message = ex.Message,
+                },
                 Status = "failed",
                 Done = true,
             }, cancellationToken).ConfigureAwait(false);

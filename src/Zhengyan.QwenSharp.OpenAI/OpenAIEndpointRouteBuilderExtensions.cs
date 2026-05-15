@@ -14,6 +14,8 @@ public sealed class OpenAIEndpointOptions
 
     public string ResponsesPath { get; init; } = "/v1/responses";
 
+    public string AudioSpeechPath { get; init; } = "/v1/audio/speech";
+
     public string RealtimePath { get; init; } = "/v1/realtime";
 
     public bool EnableRealtime { get; init; } = true;
@@ -57,6 +59,15 @@ public static class OpenAIEndpointRouteBuilderExtensions
             IOpenAIResponsesService service,
             CancellationToken cancellationToken)
             => Results.Json(await service.CreateResponseAsync(request, cancellationToken).ConfigureAwait(false), options.JsonSerializerOptions));
+
+        endpoints.MapPost(options.AudioSpeechPath, async (
+            OpenAIAudioSpeechRequest request,
+            IOpenAIAudioSpeechService service,
+            CancellationToken cancellationToken) =>
+        {
+            var (audioBytes, contentType) = await service.CreateSpeechAsync(request, cancellationToken).ConfigureAwait(false);
+            return Results.File(audioBytes, contentType);
+        });
 
         if (options.EnableRealtime)
         {
@@ -113,7 +124,11 @@ public static class OpenAIEndpointRouteBuilderExtensions
                     {
                         Type = "error",
                         Text = "Invalid realtime JSON message.",
-                        Error = ex.Message,
+                        Error = new OpenAIRealtimeError
+                        {
+                            Type = "invalid_request_error",
+                            Message = ex.Message,
+                        },
                         Done = true,
                     }, options.JsonSerializerOptions, context.RequestAborted).ConfigureAwait(false);
                     continue;
@@ -131,7 +146,11 @@ public static class OpenAIEndpointRouteBuilderExtensions
             {
                 Type = "error",
                 Text = ex.Message,
-                Error = ex.Message,
+                Error = new OpenAIRealtimeError
+                {
+                    Type = "server_error",
+                    Message = ex.Message,
+                },
                 Done = true,
             }, options.JsonSerializerOptions, context.RequestAborted).ConfigureAwait(false);
         }

@@ -36,7 +36,8 @@ try
             audioSynthesizer));
         builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
         builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-        builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniRealtimeSessionFactory>();
+        builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
+        builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniDigitalHumanRealtimeSessionFactory>();
     }
     else
     {
@@ -47,6 +48,7 @@ try
             modelName));
         builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetRequiredService<QwenTextOpenAIService>());
         builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetRequiredService<QwenTextOpenAIService>());
+        builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<QwenTextOpenAIService>());
     }
 }
 catch (DllNotFoundException ex)

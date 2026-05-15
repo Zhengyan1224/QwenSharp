@@ -2,12 +2,13 @@ using TorchSharp;
 using Zhengyan.QwenSharp.Core;
 using Zhengyan.QwenSharp.Generation;
 using Zhengyan.QwenSharp.Models;
+using Zhengyan.QwenSharp.Omni.Audio;
 using Zhengyan.QwenSharp.Tokenizers;
 using static TorchSharp.torch;
 
 namespace Zhengyan.QwenSharp.OpenAI;
 
-public sealed class QwenTextOpenAIService : IOpenAIChatCompletionsService, IOpenAIResponsesService, IDisposable
+public sealed class QwenTextOpenAIService : IOpenAIChatCompletionsService, IOpenAIResponsesService, IOpenAIAudioSpeechService, IDisposable
 {
     private readonly Qwen2Tokenizer _tokenizer;
     private readonly ICausalLM _model;
@@ -70,6 +71,28 @@ public sealed class QwenTextOpenAIService : IOpenAIChatCompletionsService, IOpen
                     Content = reply,
                 }
             ],
+        });
+    }
+
+    public Task<(byte[] AudioBytes, string ContentType)> CreateSpeechAsync(OpenAIAudioSpeechRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.Input))
+        {
+            throw new InvalidOperationException("Audio speech request requires a non-empty input.");
+        }
+
+        var wavBase64 = ManagedSpeechSynthesizer.SynthesizeToWavBase64(request.Input, request.Voice);
+        var wavBytes = Convert.FromBase64String(wavBase64);
+        var responseFormat = string.IsNullOrWhiteSpace(request.ResponseFormat)
+            ? "wav"
+            : request.ResponseFormat.Trim().ToLowerInvariant();
+
+        return Task.FromResult(responseFormat switch
+        {
+            "wav" => (wavBytes, "audio/wav"),
+            "pcm" => (ExtractPcm16FromWav(wavBytes), "application/octet-stream"),
+            _ => throw new InvalidOperationException($"Unsupported response_format '{responseFormat}'. Supported values: wav, pcm."),
         });
     }
 
@@ -138,5 +161,40 @@ public sealed class QwenTextOpenAIService : IOpenAIChatCompletionsService, IOpen
     public void Dispose()
     {
         (_model as IDisposable)?.Dispose();
+    }
+
+    private static byte[] ExtractPcm16FromWav(byte[] wavBytes)
+    {
+        if (wavBytes.Length < 44)
+        {
+            throw new InvalidOperationException("Invalid WAV payload.");
+        }
+
+        using var stream = new MemoryStream(wavBytes, writable: false);
+        using var reader = new BinaryReader(stream, System.Text.Encoding.ASCII, leaveOpen: false);
+        stream.Seek(12, SeekOrigin.Begin);
+
+        while (stream.Position + 8 <= stream.Length)
+        {
+            var chunkId = System.Text.Encoding.ASCII.GetString(reader.ReadBytes(4));
+            var chunkSize = reader.ReadInt32();
+            if (chunkSize < 0 || stream.Position + chunkSize > stream.Length)
+            {
+                throw new InvalidOperationException("Invalid WAV chunk size.");
+            }
+
+            if (string.Equals(chunkId, "data", StringComparison.Ordinal))
+            {
+                return reader.ReadBytes(chunkSize);
+            }
+
+            stream.Seek(chunkSize, SeekOrigin.Current);
+            if ((chunkSize & 1) != 0 && stream.Position < stream.Length)
+            {
+                stream.Seek(1, SeekOrigin.Current);
+            }
+        }
+
+        throw new InvalidOperationException("WAV payload does not contain a data chunk.");
     }
 }

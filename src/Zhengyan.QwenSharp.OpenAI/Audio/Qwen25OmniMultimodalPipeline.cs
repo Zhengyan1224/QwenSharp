@@ -46,18 +46,31 @@ internal static class Qwen25OmniMultimodalPipelineProcessor
         var list = messages.ToList();
         if (wantsAudio)
         {
-            const string AudioOutputSystemPrompt = "You are Qwen, a virtual human developed by the Qwen Team, Alibaba Group, capable of perceiving auditory and visual inputs, as well as generating text and speech.";
+            const string AudioOutputSystemPrompt = "System capability note: you can perceive auditory and visual inputs and generate both text and speech. Keep any existing role, persona, and style instructions as the highest priority.";
             var hasAudioPrompt = list.Count > 0
                 && string.Equals(list[0].Role, "system", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(FlattenMessage(list[0]), AudioOutputSystemPrompt, StringComparison.Ordinal);
+                && FlattenMessage(list[0]).Contains(AudioOutputSystemPrompt, StringComparison.Ordinal);
 
             if (!hasAudioPrompt)
             {
-                list.Insert(0, new OpenAIMessage
+                if (list.Count > 0 && string.Equals(list[0].Role, "system", StringComparison.OrdinalIgnoreCase))
                 {
-                    Role = "system",
-                    Content = AudioOutputSystemPrompt,
-                });
+                    var existing = FlattenMessage(list[0]);
+                    list[0] = list[0] with
+                    {
+                        Content = string.IsNullOrWhiteSpace(existing)
+                            ? AudioOutputSystemPrompt
+                            : $"{existing}\n\n{AudioOutputSystemPrompt}",
+                    };
+                }
+                else
+                {
+                    list.Insert(0, new OpenAIMessage
+                    {
+                        Role = "system",
+                        Content = AudioOutputSystemPrompt,
+                    });
+                }
             }
         }
 
