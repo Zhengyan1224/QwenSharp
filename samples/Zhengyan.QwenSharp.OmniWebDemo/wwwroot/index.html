@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zhengyan.QwenSharp Omni Web Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: rgba(10, 16, 31, 0.88);
+      --panel-strong: rgba(14, 21, 40, 0.94);
+      --panel-border: rgba(148, 163, 184, 0.18);
+      --text: #ebf3ff;
+      --muted: #98a8c1;
+      --accent: #7dd3fc;
+      --accent-2: #34d399;
+      --danger: #fb7185;
+      --shadow: 0 24px 80px rgba(2, 6, 23, 0.34);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 34%),
+        radial-gradient(circle at right center, rgba(52, 211, 153, 0.14), transparent 28%),
+        linear-gradient(180deg, #06101d 0%, #07111f 50%, #020617 100%);
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px 64px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.3rem);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
+
+    .subtitle {
+      max-width: 72ch;
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.55;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      padding: 8px 14px;
+      background: rgba(15, 23, 42, 0.76);
+      color: #d8e7ff;
+      box-shadow: var(--shadow);
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .card.hero-card {
+      background: var(--panel-strong);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.05rem;
+      letter-spacing: 0.01em;
+    }
+
+    .row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    }
+
+    .columns-2 {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #d4e0f2;
+      font-size: 0.94rem;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(2, 6, 23, 0.7);
+      color: var(--text);
+      padding: 12px 14px;
+      font: inherit;
+      outline: none;
+    }
+
+    input[type="checkbox"] {
+      width: auto;
+      margin: 0 8px 0 0;
+      accent-color: var(--accent);
+    }
+
+    textarea {
+      min-height: 160px;
+      resize: vertical;
+    }
+
+    textarea.tall {
+      min-height: 240px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .checkbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #d8e7ff;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #05111d;
+    }
+
+    button.secondary {
+      background: rgba(30, 41, 59, 0.96);
+      color: #e2e8f0;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .muted { color: var(--muted); }
+    .status { font-weight: 700; }
+    .hint {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.45;
+    }
+    .event-log {
+      min-height: 140px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      background: rgba(2, 6, 23, 0.58);
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      padding: 12px 14px;
+      overflow: auto;
+    }
+
+    audio {
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .small-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 860px) {
+      .hero {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="hero">
+    <div>
+      <div class="pill">Zhengyan.QwenSharp OpenAI-style Realtime Demo</div>
+      <h1 class="title">Qwen2.5-Omni realtime voice chat in the browser</h1>
+      <p class="subtitle">
+        Cross-platform demo. Microphone capture and playback happen in the browser, while the server exposes
+        OpenAI-style chat completions, responses, and a websocket-based realtime API.
+        The session settings below are sent to the server as `session.update`, including `instructions`,
+        `temperature`, `top_p`, `max_output_tokens`, `return_audio`, `use_audio_in_video`, and `auto_respond`.
+      </p>
+    </div>
+
+    <div class="card hero-card">
+      <h2>Session</h2>
+      <div class="row">
+        <div>
+          <label for="sampleRate">Sample rate</label>
+          <input id="sampleRate" type="number" min="8000" step="1000" value="16000" />
+        </div>
+        <div>
+          <label for="voice">Voice</label>
+          <input id="voice" type="text" list="voiceOptions" placeholder="Optional voice name" />
+          <datalist id="voiceOptions">
+            <option value="Chelsie"></option>
+            <option value="Ethan"></option>
+            <option value="Cherry"></option>
+            <option value="Serena"></option>
+          </datalist>
+          <p class="hint">
+            Suggested voices: <code>Chelsie</code>, <code>Ethan</code>, <code>Cherry</code>, <code>Serena</code>.
+            The official 7B documentation explicitly describes <code>Chelsie</code> and <code>Ethan</code>; the realtime demo also shows the other two in sample comments.
+          </p>
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <label class="checkbox"><input id="returnAudio" type="checkbox" checked />Return audio</label>
+        <label class="checkbox"><input id="useAudioInVideo" type="checkbox" checked />Use audio in video</label>
+        <label class="checkbox"><input id="autoRespond" type="checkbox" checked />Auto respond</label>
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <button id="connect">Connect</button>
+        <button id="applySettings" class="secondary" disabled>Apply Settings</button>
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <button id="start" class="secondary" disabled>Start Mic</button>
+        <button id="stop" class="secondary" disabled>Stop</button>
+        <button id="respond" class="secondary" disabled>Send Prompt</button>
+      </div>
+      <p id="status" class="status muted">Disconnected.</p>
+      <p class="small-note">
+        `use_audio_in_video` should stay consistent across the browser demo and the server session to mirror the official Omni flow.
+      </p>
+      <p class="small-note">
+        Voice workflow: click <b>Start Mic</b> to record your turn, speak, then pause. The demo will auto-submit after about 1.2 seconds of silence. Click <b>Stop</b> anytime to submit immediately. If the assistant is speaking, pressing <b>Start Mic</b> interrupts the current reply and starts a new turn.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Prompt And Instructions</h2>
+      <div class="columns-2">
+        <div>
+          <label for="instructions">Instructions</label>
+          <textarea id="instructions" class="tall" placeholder="System instructions for the realtime session."></textarea>
+        </div>
+        <div>
+          <label for="messageText">User draft</label>
+          <textarea id="messageText" class="tall" placeholder="Type a prompt for the assistant."></textarea>
+        </div>
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <div>
+          <label for="temperature">Temperature</label>
+          <input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" />
+        </div>
+        <div>
+          <label for="topP">Top P</label>
+          <input id="topP" type="number" min="0" max="1" step="0.05" value="0.9" />
+        </div>
+        <div>
+          <label for="maxOutputTokens">Max output tokens</label>
+          <input id="maxOutputTokens" type="number" min="1" step="1" value="256" />
+        </div>
+      </div>
+      <div class="row" style="margin-top: 12px;">
+        <button id="sendSettings" class="secondary">Update Session</button>
+        <button id="sendItem" class="secondary">Send Multimodal Item</button>
+        <button id="clearItem" class="secondary">Clear Draft</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Optional Multimodal Input</h2>
+      <div class="columns-2">
+        <div>
+          <label for="imageUrl">Image URL</label>
+          <input id="imageUrl" placeholder="https://example.com/image.jpg" />
+          <label for="videoUrl" style="margin-top: 12px;">Video URL or local path</label>
+          <input id="videoUrl" placeholder="https://example.com/video.mp4 or C:\\video.mp4" />
+          <label for="videoFile" style="margin-top: 12px;">Video file upload</label>
+          <input id="videoFile" type="file" accept="video/*" />
+        </div>
+        <div>
+          <label>Workflow</label>
+          <p class="hint">
+            Browser media capture stays standard Web API only. The server receives OpenAI-style multimodal parts and
+            applies the Omni preprocessing path before generating text and optional audio.
+          </p>
+          <p class="hint">
+            Local video files are read in the browser and encoded as base64 for the realtime session. URLs are sent as
+            OpenAI-style multimodal parts.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Conversation</h2>
+      <div id="log" class="event-log" aria-live="polite"></div>
+      <audio id="replyAudio" controls></audio>
+      <label style="margin-top: 16px;">Warnings</label>
+      <textarea id="warnings" class="tall" readonly></textarea>
+    </div>
+  </div>
+</main>
+
+<script>
+let socket = null;
+let audioContext = null;
+let mediaStream = null;
+let source = null;
+let processor = null;
+let recording = false;
+let stoppingRecording = false;
+let assistantGenerating = false;
+let speechDetected = false;
+let lastVoiceAt = 0;
+let autoVadArmed = false;
+const defaultSampleRate = 16000;
+const vadRmsThreshold = 0.012;
+const vadSilenceMs = 1200;
+
+const connectBtn = document.getElementById('connect');
+const applySettingsBtn = document.getElementById('applySettings');
+const sendSettingsBtn = document.getElementById('sendSettings');
+const startBtn = document.getElementById('start');
+const stopBtn = document.getElementById('stop');
+const respondBtn = document.getElementById('respond');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+const warningsEl = document.getElementById('warnings');
+const sendItemBtn = document.getElementById('sendItem');
+const clearItemBtn = document.getElementById('clearItem');
+const sampleRateEl = document.getElementById('sampleRate');
+const voiceEl = document.getElementById('voice');
+const returnAudioEl = document.getElementById('returnAudio');
+const useAudioInVideoEl = document.getElementById('useAudioInVideo');
+const autoRespondEl = document.getElementById('autoRespond');
+const instructionsEl = document.getElementById('instructions');
+const messageText = document.getElementById('messageText');
+const temperatureEl = document.getElementById('temperature');
+const topPEl = document.getElementById('topP');
+const maxOutputTokensEl = document.getElementById('maxOutputTokens');
+const imageUrl = document.getElementById('imageUrl');
+const videoUrl = document.getElementById('videoUrl');
+const videoFile = document.getElementById('videoFile');
+const replyAudio = document.getElementById('replyAudio');
+
+function setStatus(text) {
+  statusEl.textContent = text;
+}
+
+function appendLog(text) {
+  logEl.innerHTML += `${escapeHtml(text)}<br />`;
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function appendWarning(text) {
+  warningsEl.value += `${text}\n`;
+  warningsEl.scrollTop = warningsEl.scrollHeight;
+}
+
+function escapeHtml(text) {
+  return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function floatToPcm16(buffer) {
+  const bytes = new Uint8Array(buffer.length * 2);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < buffer.length; i++) {
+    const s = Math.max(-1, Math.min(1, buffer[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return bytes;
+}
+
+function downsample(buffer, inputRate, outputRate) {
+  if (outputRate >= inputRate) return buffer;
+  const ratio = inputRate / outputRate;
+  const length = Math.round(buffer.length / ratio);
+  const result = new Float32Array(length);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+    let accum = 0;
+    let count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
+function sendJson(payload) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify(payload));
+  }
+}
+
+function readNumber(element, fallback) {
+  const value = Number(element.value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function getTargetSampleRate() {
+  return Math.max(8000, Math.floor(readNumber(sampleRateEl, defaultSampleRate)));
+}
+
+function collectSessionUpdatePayload() {
+  const payload = {
+    type: 'session.update',
+    sample_rate: getTargetSampleRate(),
+    return_audio: returnAudioEl.checked,
+    use_audio_in_video: useAudioInVideoEl.checked,
+    auto_respond: autoRespondEl.checked,
+  };
+
+  const instructions = instructionsEl.value.trim();
+  const voice = voiceEl.value.trim();
+  const temperature = readNumber(temperatureEl, 0.2);
+  const topP = readNumber(topPEl, 0.9);
+  const maxOutputTokens = Math.max(1, Math.floor(readNumber(maxOutputTokensEl, 256)));
+
+  if (instructions) payload.instructions = instructions;
+  if (voice) payload.voice = voice;
+  if (Number.isFinite(temperature)) payload.temperature = temperature;
+  if (Number.isFinite(topP)) payload.top_p = topP;
+  if (Number.isFinite(maxOutputTokens)) payload.max_output_tokens = maxOutputTokens;
+
+  return payload;
+}
+
+function sendSessionUpdate() {
+  sendJson(collectSessionUpdatePayload());
+}
+
+function updateTurnStatus() {
+  if (recording) {
+    if (speechDetected) {
+      setStatus(autoVadArmed ? 'Recording... stop speaking to auto-submit.' : 'Recording...');
+    } else {
+      setStatus('Listening...');
+    }
+    return;
+  }
+
+  if (assistantGenerating) {
+    setStatus('Assistant speaking...');
+    return;
+  }
+
+  setStatus('Ready.');
+}
+
+function computeRms(buffer) {
+  if (!buffer || buffer.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    const sample = buffer[i];
+    sum += sample * sample;
+  }
+  return Math.sqrt(sum / buffer.length);
+}
+
+function disconnectRecordingGraph() {
+  if (processor) processor.disconnect();
+  if (source) source.disconnect();
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  if (audioContext) audioContext.close();
+
+  processor = null;
+  source = null;
+  mediaStream = null;
+  audioContext = null;
+}
+
+function sendResponseCancel() {
+  sendJson({ type: 'response.cancel' });
+}
+
+async function stopRecording(commitReason = 'manual') {
+  if (!recording || stoppingRecording) {
+    return;
+  }
+
+  stoppingRecording = true;
+  recording = false;
+  stopBtn.disabled = true;
+  startBtn.disabled = false;
+  respondBtn.disabled = false;
+
+  if (commitReason === 'auto') {
+    appendLog('auto submit: silence detected');
+    setStatus('Submitting audio turn...');
+  } else {
+    setStatus('Processing...');
+  }
+
+  sendJson({ type: 'input_audio_buffer.commit' });
+  disconnectRecordingGraph();
+  autoVadArmed = false;
+  speechDetected = false;
+  lastVoiceAt = 0;
+  stoppingRecording = false;
+}
+
+async function startRecording() {
+  if (!window.isSecureContext) {
+    setStatus('Microphone access requires HTTPS or localhost. Please open the demo from https:// or http://localhost.');
+    return;
+  }
+
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    setStatus('This browser does not expose navigator.mediaDevices.getUserMedia(). Try a modern browser over HTTPS.');
+    return;
+  }
+
+  if (assistantGenerating) {
+    appendLog('interrupt: cancelling the current assistant response');
+    sendResponseCancel();
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new AudioContext();
+    source = audioContext.createMediaStreamSource(mediaStream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    recording = true;
+    stoppingRecording = false;
+    speechDetected = false;
+    lastVoiceAt = performance.now();
+    autoVadArmed = true;
+
+    processor.onaudioprocess = (ev) => {
+      if (!recording || !socket || socket.readyState !== WebSocket.OPEN || stoppingRecording) {
+        return;
+      }
+
+      const input = ev.inputBuffer.getChannelData(0);
+      const targetSampleRate = getTargetSampleRate();
+      const downsampled = downsample(input, audioContext.sampleRate, targetSampleRate);
+      const rms = computeRms(downsampled);
+      const now = performance.now();
+
+      if (rms >= vadRmsThreshold) {
+        speechDetected = true;
+        lastVoiceAt = now;
+      } else if (speechDetected && now - lastVoiceAt >= vadSilenceMs) {
+        stopRecording('auto');
+        return;
+      }
+
+      const pcm16 = floatToPcm16(downsampled);
+      sendJson({
+        type: 'input_audio_buffer.append',
+        audio_base64: bytesToBase64(pcm16),
+        format: 'pcm16',
+        sample_rate: targetSampleRate
+      });
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    respondBtn.disabled = true;
+    updateTurnStatus();
+  } catch (err) {
+    const message = err && typeof err === 'object' && 'name' in err
+      ? `${err.name}: ${err.message || 'Unable to start microphone capture.'}`
+      : 'Unable to start microphone capture.';
+    setStatus(message);
+    console.error(err);
+    recording = false;
+    stoppingRecording = false;
+    disconnectRecordingGraph();
+  }
+}
+
+async function buildDraftParts() {
+  const parts = [];
+  const text = messageText.value.trim();
+  const image = imageUrl.value.trim();
+  const video = videoUrl.value.trim();
+
+  if (image) parts.push({ type: 'image_url', image_url: { url: image } });
+  if (videoFile.files && videoFile.files.length > 0) {
+    const file = videoFile.files[0];
+    parts.push({ type: 'video', video: { data: await readFileAsBase64(file), format: inferVideoFormat(file.name) } });
+  } else if (video) {
+    parts.push({ type: 'video', video: { url: video } });
+  }
+  if (text) parts.push({ type: 'text', text });
+
+  return parts;
+}
+
+async function sendDraftAndMaybeRespond(requestResponse) {
+  const parts = await buildDraftParts();
+  if (parts.length === 0) {
+    setStatus('Enter text, image URL, or video input first.');
+    return false;
+  }
+
+  sendJson({ type: 'conversation.item.create', role: 'user', parts });
+  if (requestResponse) sendJson({ type: 'response.create' });
+
+  appendLog(`user draft sent: ${messageText.value.trim() || '[multimodal input]'}`);
+  setStatus(requestResponse ? 'Prompt sent.' : 'Draft sent.');
+  return true;
+}
+
+function inferVideoFormat(name) {
+  const idx = name.lastIndexOf('.');
+  if (idx < 0) return 'mp4';
+  return name.slice(idx + 1).toLowerCase() || 'mp4';
+}
+
+async function readFileAsBase64(file) {
+  const buffer = await file.arrayBuffer();
+  return bytesToBase64(new Uint8Array(buffer));
+}
+
+connectBtn.onclick = () => {
+  const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+  socket = new WebSocket(`${protocol}://${location.host}/v1/realtime`);
+  socket.binaryType = 'arraybuffer';
+
+  socket.onopen = () => {
+    startBtn.disabled = false;
+    respondBtn.disabled = false;
+    applySettingsBtn.disabled = false;
+    sendSettingsBtn.disabled = false;
+    stopBtn.disabled = true;
+    setStatus('Connected.');
+    sendSessionUpdate();
+  };
+
+  socket.onmessage = async (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'session.updated') {
+      setStatus(`Connected. Sample rate ${msg.sample_rate || getTargetSampleRate()} Hz. return_audio=${msg.return_audio ?? returnAudioEl.checked}`);
+      return;
+    }
+    if (msg.type === 'session.created') {
+      appendLog(`Session created: ${msg.session_id || 'n/a'}`);
+      return;
+    }
+    if (msg.type === 'conversation.item.created') {
+      const role = msg.role || 'user';
+      const text = msg.text || '';
+      appendLog(`${role}: ${text}`);
+      return;
+    }
+    if (msg.type === 'response.warning') {
+      const warning = msg.warning || 'Unknown warning.';
+      appendWarning(warning);
+      appendLog(`warning: ${warning}`);
+      return;
+    }
+    if (msg.type === 'response.created') {
+      appendLog(`response created: ${msg.response_id || 'n/a'} ${msg.status ? `[${msg.status}]` : ''}`);
+      assistantGenerating = msg.status === 'in_progress';
+      updateTurnStatus();
+      return;
+    }
+    if (msg.type === 'response.cancelled') {
+      assistantGenerating = false;
+      appendLog('assistant response cancelled.');
+      updateTurnStatus();
+      return;
+    }
+    if (msg.type === 'error') {
+      const error = msg.error || msg.text || 'Unknown realtime error.';
+      appendWarning(error);
+      setStatus(`Error: ${error}`);
+      assistantGenerating = false;
+      recording = false;
+      return;
+    }
+    if (msg.type === 'response.output_text.delta') {
+      assistantGenerating = true;
+      appendLog(`assistant: ${msg.text || ''}`);
+      updateTurnStatus();
+      return;
+    }
+    if (msg.type === 'response.output_audio.delta' && msg.audio_base64) {
+      assistantGenerating = true;
+      const bytes = Uint8Array.from(atob(msg.audio_base64), c => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: msg.format === 'wav' ? 'audio/wav' : 'application/octet-stream' });
+      replyAudio.src = URL.createObjectURL(blob);
+      await replyAudio.play();
+      updateTurnStatus();
+      return;
+    }
+    if (msg.type === 'response.done') {
+      assistantGenerating = false;
+      if (msg.text) {
+        appendLog(`assistant final: ${msg.text}`);
+      }
+      setStatus('Response complete.');
+      return;
+    }
+    if (msg.type === 'response.completed') {
+      assistantGenerating = false;
+      setStatus('Response complete.');
+      return;
+    }
+  };
+
+  socket.onclose = () => {
+    setStatus('Disconnected.');
+    startBtn.disabled = true;
+    stopBtn.disabled = true;
+    respondBtn.disabled = true;
+    applySettingsBtn.disabled = true;
+    sendSettingsBtn.disabled = true;
+    assistantGenerating = false;
+    recording = false;
+  };
+};
+
+applySettingsBtn.onclick = () => {
+  sendSessionUpdate();
+  setStatus('Session update sent.');
+};
+
+sendSettingsBtn.onclick = () => {
+  sendSessionUpdate();
+  setStatus('Session update sent.');
+};
+
+startBtn.onclick = async () => {
+  await startRecording();
+};
+
+stopBtn.onclick = async () => {
+  await stopRecording('manual');
+};
+
+respondBtn.onclick = async () => {
+  await sendDraftAndMaybeRespond(true);
+};
+
+sendItemBtn.onclick = async () => {
+  await sendDraftAndMaybeRespond(false);
+};
+
+clearItemBtn.onclick = () => {
+  messageText.value = '';
+  imageUrl.value = '';
+  videoUrl.value = '';
+  videoFile.value = '';
+  setStatus('Draft cleared.');
+};
+</script>
+</body>
+</html>

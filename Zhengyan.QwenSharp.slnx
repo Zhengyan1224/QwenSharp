@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Zhengyan.QwenSharp.OpenAI/Zhengyan.QwenSharp.OpenAI.csproj" />
+    <Project Path="src/Zhengyan.QwenSharp/Zhengyan.QwenSharp.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Zhengyan.QwenSharp.Cli/Zhengyan.QwenSharp.Cli.csproj" />
+    <Project Path="samples/Zhengyan.QwenSharp.OmniWebDemo/Zhengyan.QwenSharp.OmniWebDemo.csproj" />
+    <Project Path="samples/Zhengyan.QwenSharp.Server/Zhengyan.QwenSharp.Server.csproj" />
+  </Folder>
+</Solution>

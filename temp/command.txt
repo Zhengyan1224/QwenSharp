@@ -1,0 +1,4 @@
+export LD_LIBRARY_PATH=/data/Amasonwe/yes/envs/qwen/lib/python3.10/site-packages/torch/lib:$LD_LIBRARY_PATH
+
+
+dotnet run --project samples/Zhengyan.QwenSharp.OmniWebDemo/

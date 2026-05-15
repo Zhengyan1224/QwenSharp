@@ -1,0 +1,55 @@
+## .gitignore for TransformersSharp (.NET 10 + TorchSharp)
+
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!.nuget/NuGet.Config
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+.idea.TransformersSharp/
+
+# dotnet publish outputs
+publish/
+PublishProfiles/
+
+# Test results
+TestResults/
+coverage/
+*.trx
+*.coveragexml
+
+# Model weights (large binary files — do NOT commit)
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.gguf
+/models/
+/weights/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

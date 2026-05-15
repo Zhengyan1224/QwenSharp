@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <LangVersion>latest</LangVersion>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <AssemblyName>Zhengyan.QwenSharp</AssemblyName>
+    <RootNamespace>Zhengyan.QwenSharp</RootNamespace>
+    <Description>Qwen series LLM implementation for .NET 10 using TorchSharp</Description>
+    <NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="1.12.38" />
+    <PackageReference Include="TorchSharp" Version="0.106.0" />
+    <PackageReference Include="TorchAudio" Version="0.106.0" />
+    <PackageReference Include="TorchVision" Version="0.106.0" />
+  </ItemGroup>
+
+</Project>

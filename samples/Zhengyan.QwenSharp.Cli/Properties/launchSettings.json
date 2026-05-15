@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Zhengyan.QwenSharp.Cli": {
+      "commandName": "Project",
+      "commandLineArgs": "chat --model-path D:\\working\\RAG\\GrowRAG\\sglang_models\\Qwen3-1.7B"
+    }
+  }
+}
