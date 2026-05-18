@@ -27,6 +27,18 @@ try
         demoOptions.DType,
         demoOptions.DeviceMap,
         audioSynthesizer));
+
+    if (demoOptions.Realtime.DisableMultiGpu && !string.IsNullOrWhiteSpace(demoOptions.DeviceMap))
+    {
+        var realtimeDevice = ResolveRealtimeSingleDevice(demoOptions.DeviceMap, demoOptions.Device);
+        builder.Services.AddSingleton(new Qwen25OmniOpenAIService(
+            modelPath,
+            demoOptions.DisableTalker,
+            realtimeDevice,
+            demoOptions.DType,
+            deviceMap: null,
+            audioSynthesizer));
+    }
 }
 catch (DllNotFoundException ex)
 {
@@ -42,10 +54,19 @@ catch (ExternalException ex) when (IsCudaOutOfMemory(ex) && !string.Equals(demoO
         ex);
 }
 
-builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniRealtimeSessionFactory>();
+builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetServices<Qwen25OmniOpenAIService>().First());
+builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetServices<Qwen25OmniOpenAIService>().First());
+builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp =>
+{
+    var services = sp.GetServices<Qwen25OmniOpenAIService>().ToArray();
+    return services.Length > 1 ? services[^1] : services[0];
+});
+builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory>(sp =>
+{
+    var services = sp.GetServices<Qwen25OmniOpenAIService>().ToArray();
+    var service = services.Length > 1 ? services[^1] : services[0];
+    return new Qwen25OmniRealtimeSessionFactory(service);
+});
 
 var app = builder.Build();
 app.UseWebSockets();
@@ -356,6 +377,22 @@ static bool IsCudaOutOfMemory(Exception ex)
     => ex.Message.Contains("CUDA out of memory", StringComparison.OrdinalIgnoreCase)
        || ex.Message.Contains("CUDACachingAllocator", StringComparison.OrdinalIgnoreCase);
 
+static string? ResolveRealtimeSingleDevice(string? deviceMap, string? device)
+{
+    if (!string.IsNullOrWhiteSpace(deviceMap))
+    {
+        var first = deviceMap
+            .Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(first) && !string.Equals(first, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return first;
+        }
+    }
+
+    return string.IsNullOrWhiteSpace(device) ? "cpu" : device;
+}
+
 internal sealed class OmniWebDemoOptions
 {
     public string? ModelPath { get; set; }
@@ -415,4 +452,6 @@ internal sealed class OmniRealtimeOptions
     public bool UseAudioInVideo { get; set; } = true;
 
     public string? Voice { get; set; }
+
+    public bool DisableMultiGpu { get; set; }
 }

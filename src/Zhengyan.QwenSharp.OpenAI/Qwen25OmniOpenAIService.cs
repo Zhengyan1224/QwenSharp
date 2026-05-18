@@ -720,7 +720,11 @@ public sealed class Qwen25OmniOpenAIService : IOpenAIChatCompletionsService, IOp
         }
 
         instruction.AppendLine("Tools:");
-        instruction.AppendLine(JsonSerializer.Serialize(tools, new JsonSerializerOptions { WriteIndented = false }));
+        instruction.AppendLine(JsonSerializer.Serialize(tools, new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        }));
 
         var list = messages.ToList();
         list.Insert(0, new OpenAIMessage

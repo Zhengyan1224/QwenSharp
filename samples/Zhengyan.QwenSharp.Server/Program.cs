@@ -36,8 +36,27 @@ try
             audioSynthesizer));
         builder.Services.AddSingleton<IOpenAIChatCompletionsService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
         builder.Services.AddSingleton<IOpenAIResponsesService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-        builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
-        builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniDigitalHumanRealtimeSessionFactory>();
+
+        if (serverOptions.Realtime.DisableMultiGpu && !string.IsNullOrWhiteSpace(serverOptions.DeviceMap))
+        {
+            var realtimeDevice = ResolveRealtimeSingleDevice(serverOptions.DeviceMap, serverOptions.Device);
+            builder.Services.AddSingleton(new Qwen25OmniOpenAIService(
+                modelPath,
+                serverOptions.DisableTalker,
+                realtimeDevice,
+                serverOptions.DType,
+                deviceMap: null,
+                audioSynthesizer));
+            builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp =>
+                sp.GetServices<Qwen25OmniOpenAIService>().Last());
+            builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory>(sp =>
+                new Qwen25OmniDigitalHumanRealtimeSessionFactory(sp.GetServices<Qwen25OmniOpenAIService>().Last()));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IOpenAIAudioSpeechService>(sp => sp.GetRequiredService<Qwen25OmniOpenAIService>());
+            builder.Services.AddSingleton<IOpenAIRealtimeSessionFactory, Qwen25OmniDigitalHumanRealtimeSessionFactory>();
+        }
     }
     else
     {
@@ -134,6 +153,7 @@ static void ApplyCommandLineOverrides(QwenSharpServerOptions options, string[] a
     SetBoolArg(args, "--force-omni", value => options.ForceOmni = value);
     SetBoolArg(args, "--disable-talker", value => options.DisableTalker = value);
     SetBoolArg(args, "--no-cuda-cache", value => options.NoCudaCache = value);
+    SetBoolArg(args, "--realtime-disable-multigpu", value => options.Realtime.DisableMultiGpu = value);
 
     SetStringArg(args, "--tts-model", value => options.Tts.ModelPath = value);
     SetStringArg(args, "--tts-tokens", value => options.Tts.TokensPath = value);
@@ -398,6 +418,22 @@ static bool IsCudaOutOfMemory(Exception ex)
     => ex.Message.Contains("CUDA out of memory", StringComparison.OrdinalIgnoreCase)
        || ex.Message.Contains("CUDACachingAllocator", StringComparison.OrdinalIgnoreCase);
 
+static string? ResolveRealtimeSingleDevice(string? deviceMap, string? device)
+{
+    if (!string.IsNullOrWhiteSpace(deviceMap))
+    {
+        var first = deviceMap
+            .Split([',', ';', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(first) && !string.Equals(first, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return first;
+        }
+    }
+
+    return string.IsNullOrWhiteSpace(device) ? "cpu" : device;
+}
+
 internal sealed class QwenSharpServerOptions
 {
     public string? ModelPath { get; set; }
@@ -459,4 +495,6 @@ internal sealed class QwenSharpRealtimeOptions
     public bool UseAudioInVideo { get; set; } = true;
 
     public string? Voice { get; set; }
+
+    public bool DisableMultiGpu { get; set; }
 }

@@ -110,10 +110,31 @@ Models/
     "DType": "float16",
     "DeviceMap": null,
     "DisableTalker": false,
-    "NoCudaCache": false
+    "NoCudaCache": false,
+    "Realtime": {
+      "DisableMultiGpu": false
+    }
   }
 }
 ```
+
+推荐的多卡 Server 配置模板如下，适合“普通 HTTP 请求走多卡，Realtime 保持单卡稳定”的场景：
+
+```json
+{
+  "QwenSharp": {
+    "ModelPath": "/data/models/Qwen2.5-Omni-7B",
+    "Device": "cuda:0",
+    "DType": "float16",
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+这样配置后，`/v1/chat/completions` 和 `/v1/responses` 继续走多卡路径，而 `/v1/realtime` 和 `/v1/audio/speech` 会切到绑定在 `DeviceMap` 第一张卡上的单卡 Omni 实例，实时对话更稳。
 
 启动服务：
 
@@ -306,6 +327,37 @@ Omni 多卡推理可以设置 `DeviceMap`：
   }
 }
 ```
+
+推荐的 Server 配置模板如下，适合“普通 HTTP 请求走多卡，Realtime 和语音合成保持单卡稳定”的场景：
+
+```json
+{
+  "QwenSharp": {
+    "ModelPath": "/data/models/Qwen2.5-Omni-7B",
+    "Device": "cuda:0",
+    "DType": "float16",
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+如果你希望普通 HTTP 请求继续走多卡，但把 Realtime 和 `/v1/audio/speech` 强制切回单卡，可以启用：
+
+```json
+{
+  "QwenSharp": {
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+启用后，`Zhengyan.QwenSharp.Server` 会额外加载一份绑定到 `DeviceMap` 第一张卡的单卡 Omni 服务。`/v1/chat/completions` 和 `/v1/responses` 继续使用多卡服务，而 `/v1/realtime` 和 `/v1/audio/speech` 会切到单卡服务，以提高实时对话稳定性。代价是进程里会常驻另一份 Omni 模型显存/内存。
 
 也可以通过 `--device-map auto` 使用当前进程可见的全部 CUDA 设备。如果设置了 `CUDA_VISIBLE_DEVICES=2,3`，进程内部会把这两张卡看作 `cuda:0` 和 `cuda:1`。
 

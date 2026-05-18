@@ -110,10 +110,31 @@ Edit [samples/Zhengyan.QwenSharp.Server/appsettings.json](samples/Zhengyan.QwenS
     "DType": "float16",
     "DeviceMap": null,
     "DisableTalker": false,
-    "NoCudaCache": false
+    "NoCudaCache": false,
+    "Realtime": {
+      "DisableMultiGpu": false
+    }
   }
 }
 ```
+
+Recommended multi-GPU server template for stable Realtime:
+
+```json
+{
+  "QwenSharp": {
+    "ModelPath": "/data/models/Qwen2.5-Omni-7B",
+    "Device": "cuda:0",
+    "DType": "float16",
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+This keeps `/v1/chat/completions` and `/v1/responses` on the multi-GPU path, while `/v1/realtime` and `/v1/audio/speech` use a single-device Omni instance pinned to the first device in `DeviceMap`.
 
 Then start the server:
 
@@ -306,6 +327,37 @@ For multi-GPU Omni inference, set `DeviceMap`:
   }
 }
 ```
+
+Recommended server template for stable Realtime and speech synthesis:
+
+```json
+{
+  "QwenSharp": {
+    "ModelPath": "/data/models/Qwen2.5-Omni-7B",
+    "Device": "cuda:0",
+    "DType": "float16",
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+If you want to keep regular HTTP inference on a multi-GPU Omni service but force Realtime and `/v1/audio/speech` back to a single GPU, enable:
+
+```json
+{
+  "QwenSharp": {
+    "DeviceMap": "cuda:0,cuda:1",
+    "Realtime": {
+      "DisableMultiGpu": true
+    }
+  }
+}
+```
+
+When `Realtime.DisableMultiGpu` is `true`, `Zhengyan.QwenSharp.Server` loads an additional single-device Omni service pinned to the first device from `DeviceMap`. The regular `/v1/chat/completions` and `/v1/responses` endpoints still use the multi-GPU service, while `/v1/realtime` and `/v1/audio/speech` use the single-GPU service for better conversational stability. This improves Realtime reliability, but it also means the process keeps another copy of the Omni model in memory.
 
 You can also pass `--device-map auto` to use all visible CUDA devices in order. If you set `CUDA_VISIBLE_DEVICES=2,3`, the process sees those cards as `cuda:0` and `cuda:1`.
 
