@@ -183,6 +183,80 @@ public sealed class Qwen25OmniOpenAIService : IOpenAIChatCompletionsService, IOp
         return Task.FromResult(ConvertSpeechOutput(managedBytes, responseFormat));
     }
 
+    internal async Task<Qwen25OmniRealtimeGenerationContext> CreateRealtimeGenerationContextAsync(
+        IReadOnlyList<OpenAIMessage> messages,
+        string? instructions,
+        bool wantsAudio,
+        bool useAudioInVideo,
+        CancellationToken cancellationToken)
+    {
+        var inputMessages = ApplyResponseInstructions(messages, instructions);
+        using var pipeline = await Qwen25OmniMultimodalPipelineProcessor.BuildAsync(
+            inputMessages,
+            AudioOutputSystemPrompt,
+            wantsAudio,
+            useAudioInVideo,
+            cancellationToken).ConfigureAwait(false);
+
+        Tensor? audioFeatures = null;
+        if (pipeline.MmInfo.Audios.Count > 0)
+        {
+            audioFeatures = LoadMelSpectrogram(pipeline.MmInfo.Audios[0].Path);
+        }
+
+        var context = new Qwen25OmniRealtimeGenerationContext(
+            pipeline.MmInfo,
+            pipeline.MmInfo.Messages.ToArray(),
+            audioFeatures,
+            pipeline.MmInfo.VisionInputs.Count > 0,
+            pipeline.MmInfo.Warnings.ToArray());
+        return context;
+    }
+
+    internal IEnumerable<string> StreamRealtimeText(
+        Qwen25OmniRealtimeGenerationContext context,
+        float? temperature,
+        float? topP,
+        int? maxTokens,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (context.HasVisionInputs)
+        {
+            yield return RunVisionTextCompletion(context.MmInfo, temperature, topP, maxTokens);
+            yield break;
+        }
+
+        int[] promptIds = context.AudioFeatures is null
+            ? BuildTextPromptIds(context.Messages)
+            : BuildOmniPromptIds(context.Messages, context.AudioFeatures);
+        using var inputIds = CreateInputIdsTensor(promptIds);
+        var config = BuildGenerationConfig(
+            context.AudioFeatures is null ? temperature : temperature ?? 0f,
+            context.AudioFeatures is null ? topP : topP ?? 1f,
+            maxTokens);
+        foreach (var delta in DecodeGeneratedTextDeltas(inputIds, context.AudioFeatures, config, cancellationToken))
+        {
+            yield return delta;
+        }
+    }
+
+    internal string SynthesizeRealtimeSpeechToWavBase64(string text, string? voice)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var voiceProfile = ResolveVoiceProfile(voice, out _);
+        if (_audioSynthesizer is not null)
+        {
+            return _audioSynthesizer.SynthesizeToWavBase64(text, voiceProfile.Name);
+        }
+
+        return ManagedSpeechSynthesizer.SynthesizeToWavBase64(text, voiceProfile.Name);
+    }
+
     private async Task<OpenAIResponseResponse> CreateResponseCoreAsync(
         OpenAIResponseRequest request,
         bool wantsAudio,
@@ -430,6 +504,88 @@ public sealed class Qwen25OmniOpenAIService : IOpenAIChatCompletionsService, IOp
         using var inputIds = CreateInputIdsTensor(promptIds);
         var config = BuildGenerationConfig(temperature, topP, maxTokens);
         return DecodeGeneratedTokens(_thinker, inputIds, config);
+    }
+
+    private IEnumerable<string> DecodeGeneratedTextDeltas(
+        Tensor inputIds,
+        Tensor? audioFeatures,
+        GenerationConfig config,
+        CancellationToken cancellationToken)
+    {
+        var decodedTokenIds = new List<int>();
+        var emittedLength = 0;
+        using var noGrad = no_grad();
+        var kvCache = new KVCache();
+        var current = inputIds;
+        var firstStep = true;
+        const int MaxCacheLen = 2048;
+        try
+        {
+            using var audio = audioFeatures is null
+                ? null
+                : (_modelDtype is not null
+                    ? audioFeatures.to(_modelDtype.Value, _device)
+                    : audioFeatures.to(_device));
+
+            for (var step = 0; step < config.MaxNewTokens; step++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                int next;
+                using (var scope = NewDisposeScope())
+                {
+                    using var logits = audio is not null && firstStep
+                        ? _thinker.forward(current, inputFeatures: audio, positionIds: null, kvCache: kvCache)
+                        : ((ICausalLM)_thinker).forward(current, kvCache: kvCache);
+
+                    next = SampleNextToken(logits[0, -1, ..], config);
+                }
+
+                if (IsEos(next))
+                {
+                    break;
+                }
+
+                decodedTokenIds.Add(next);
+                string decoded = _tokenizer.Decode(decodedTokenIds, skipSpecialTokens: true);
+                if (decoded.Length > emittedLength)
+                {
+                    string delta = decoded[emittedLength..];
+                    emittedLength = decoded.Length;
+                    if (!string.IsNullOrEmpty(delta))
+                    {
+                        yield return delta;
+                    }
+                }
+
+                if (step > 0)
+                {
+                    current.Dispose();
+                }
+
+                current = CreateSingleTokenTensor(next);
+                firstStep = false;
+
+                if (kvCache.GetSeqLength() > MaxCacheLen)
+                {
+                    kvCache.Trim(MaxCacheLen);
+                }
+
+                if ((step + 1) % 30 == 0)
+                {
+                    CollectNativeTensorMemory();
+                }
+            }
+        }
+        finally
+        {
+            if (!ReferenceEquals(current, inputIds))
+            {
+                current.Dispose();
+            }
+
+            kvCache.Dispose();
+            CollectNativeTensorMemory();
+        }
     }
 
     private string RunOmniTextCompletion(IReadOnlyList<OpenAIMessage> messages, Tensor audioFeatures, float? temperature, float? topP, int? maxTokens)
@@ -1357,6 +1513,38 @@ public sealed class Qwen25OmniOpenAIService : IOpenAIChatCompletionsService, IOp
         }
 
         return output;
+    }
+
+    internal sealed class Qwen25OmniRealtimeGenerationContext : IDisposable
+    {
+        public Qwen25OmniRealtimeGenerationContext(
+            Qwen25OmniMmInfo mmInfo,
+            IReadOnlyList<OpenAIMessage> messages,
+            Tensor? audioFeatures,
+            bool hasVisionInputs,
+            IReadOnlyList<string> warnings)
+        {
+            MmInfo = mmInfo;
+            Messages = messages;
+            AudioFeatures = audioFeatures;
+            HasVisionInputs = hasVisionInputs;
+            Warnings = warnings;
+        }
+
+        public Qwen25OmniMmInfo MmInfo { get; }
+
+        public IReadOnlyList<OpenAIMessage> Messages { get; }
+
+        public Tensor? AudioFeatures { get; }
+
+        public bool HasVisionInputs { get; }
+
+        public IReadOnlyList<string> Warnings { get; }
+
+        public void Dispose()
+        {
+            AudioFeatures?.Dispose();
+        }
     }
 
     private sealed record VoiceProfile(string Name, float PitchScale, float Gain);

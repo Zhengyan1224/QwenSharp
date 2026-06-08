@@ -365,30 +365,6 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
             }
 
             var wantsAudio = responseRequest?.OutputModalities?.Contains("audio", StringComparer.OrdinalIgnoreCase) ?? _returnAudio;
-            var response = await _service.CreateResponseAsync(new OpenAIResponseRequest
-            {
-                Model = responseRequest?.Model ?? _model,
-                Input = messages,
-                Voice = responseRequest?.Audio?.Voice ?? _voice,
-                Modalities = wantsAudio ? ["text", "audio"] : ["text"],
-                MaxOutputTokens = responseRequest?.MaxOutputTokens ?? _maxOutputTokens ?? 256,
-                Temperature = responseRequest?.Temperature ?? _temperature,
-                TopP = _topP,
-                UseAudioInVideo = _useAudioInVideo,
-            }, generationCts.Token).ConfigureAwait(false);
-
-            var output = response.Output.FirstOrDefault();
-            if (output is null)
-            {
-                await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
-                {
-                    Type = "response.done",
-                    SessionId = _sessionId,
-                    Done = true,
-                }, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
             var responseId = $"resp_{Guid.NewGuid():N}";
             var assistantItemId = $"item_{Guid.NewGuid():N}";
             var previousItemId = _lastItemId;
@@ -407,48 +383,65 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
                 Done = true,
             }, cancellationToken).ConfigureAwait(false);
 
-            if (!string.IsNullOrWhiteSpace(output.Content))
+            using var context = await _service.CreateRealtimeGenerationContextAsync(
+                messages,
+                null,
+                wantsAudio,
+                _useAudioInVideo,
+                generationCts.Token).ConfigureAwait(false);
+
+            var assistantText = new StringBuilder();
+            var pendingSpeech = new StringBuilder();
+            foreach (var warning in context.Warnings)
             {
+                await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
+                {
+                    Type = "response.warning",
+                    SessionId = _sessionId,
+                    ResponseId = responseId,
+                    Warning = warning,
+                    Status = "degraded",
+                    Model = responseRequest?.Model ?? _model,
+                    Done = true,
+                }, generationCts.Token).ConfigureAwait(false);
+            }
+
+            foreach (var delta in _service.StreamRealtimeText(
+                         context,
+                         responseRequest?.Temperature ?? _temperature,
+                         _topP,
+                         responseRequest?.MaxOutputTokens ?? _maxOutputTokens ?? 256,
+                         generationCts.Token))
+            {
+                assistantText.Append(delta);
                 await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
                 {
                     Type = "response.output_text.delta",
                     SessionId = _sessionId,
                     ResponseId = responseId,
-                    Delta = output.Content,
-                    Text = output.Content,
+                    Delta = delta,
+                    Text = delta,
                     OutputIndex = 0,
                     ContentIndex = 0,
-                    Done = true,
-                }, cancellationToken).ConfigureAwait(false);
+                    Done = false,
+                }, generationCts.Token).ConfigureAwait(false);
+
+                if (wantsAudio)
+                {
+                    pendingSpeech.Append(delta);
+                    if (TryTakeSpeakableChunk(pendingSpeech, force: false, out var speechText))
+                    {
+                        await SendSpeechChunkAsync(responseId, speechText, responseRequest, generationCts.Token).ConfigureAwait(false);
+                    }
+                }
             }
 
-            if (wantsAudio && !string.IsNullOrWhiteSpace(output.AudioBase64))
+            if (wantsAudio && TryTakeSpeakableChunk(pendingSpeech, force: true, out var finalSpeechText))
             {
-                var targetRate = responseRequest?.Audio?.Format?.Rate ?? 24_000;
-                var pcmDelta = ConvertWavBase64ToPcmBase64(output.AudioBase64, targetRate);
-                await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
-                {
-                    Type = "response.output_audio_transcript.delta",
-                    SessionId = _sessionId,
-                    ResponseId = responseId,
-                    Delta = output.Content,
-                    Transcript = output.Content,
-                    OutputIndex = 0,
-                    ContentIndex = 1,
-                    Done = true,
-                }, cancellationToken).ConfigureAwait(false);
-
-                await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
-                {
-                    Type = "response.output_audio.delta",
-                    SessionId = _sessionId,
-                    ResponseId = responseId,
-                    Delta = pcmDelta,
-                    OutputIndex = 0,
-                    ContentIndex = 1,
-                    Done = true,
-                }, cancellationToken).ConfigureAwait(false);
+                await SendSpeechChunkAsync(responseId, finalSpeechText, responseRequest, generationCts.Token).ConfigureAwait(false);
             }
+
+            var outputContent = assistantText.ToString().Trim();
 
             var assistantItem = new OpenAIRealtimeConversationItem
             {
@@ -461,13 +454,13 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
                     new OpenAIRealtimeContentPart
                     {
                         Type = wantsAudio ? "audio" : "text",
-                        Transcript = output.Content,
-                        Text = wantsAudio ? null : output.Content
+                        Transcript = outputContent,
+                        Text = wantsAudio ? null : outputContent
                     }
                 ]
             };
 
-            _conversation.Add((assistantItemId, new OpenAIMessage { Role = "assistant", Content = output.Content }));
+            _conversation.Add((assistantItemId, new OpenAIMessage { Role = "assistant", Content = outputContent }));
             _lastItemId = assistantItemId;
 
             await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
@@ -478,25 +471,25 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
                 PreviousItemId = previousItemId,
                 Item = assistantItem,
                 Role = "assistant",
-                Text = output.Content,
+                Text = outputContent,
                 Done = true,
             }, cancellationToken).ConfigureAwait(false);
 
-                await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
+            await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
+            {
+                Type = "response.done",
+                SessionId = _sessionId,
+                ResponseId = responseId,
+                Response = new OpenAIRealtimeResponseInfo
                 {
-                    Type = "response.done",
-                    SessionId = _sessionId,
-                    ResponseId = responseId,
-                    Response = new OpenAIRealtimeResponseInfo
-                    {
-                        Id = responseId,
-                        Status = "completed",
-                        Output = [assistantItem]
-                    },
-                    Text = output.Content,
-                    Done = true,
-                }, cancellationToken).ConfigureAwait(false);
-            }
+                    Id = responseId,
+                    Status = "completed",
+                    Output = [assistantItem]
+                },
+                Text = outputContent,
+                Done = true,
+            }, cancellationToken).ConfigureAwait(false);
+        }
         finally
         {
             lock (_stateLock)
@@ -599,6 +592,85 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
 				*/
 				return instructions.Trim();
     }
+
+    private async Task SendSpeechChunkAsync(
+        string responseId,
+        string text,
+        OpenAIRealtimeResponseRequest? responseRequest,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        var targetRate = responseRequest?.Audio?.Format?.Rate ?? 24_000;
+        var wavBase64 = _service.SynthesizeRealtimeSpeechToWavBase64(text, responseRequest?.Audio?.Voice ?? _voice);
+        if (string.IsNullOrWhiteSpace(wavBase64))
+        {
+            return;
+        }
+
+        await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
+        {
+            Type = "response.output_audio_transcript.delta",
+            SessionId = _sessionId,
+            ResponseId = responseId,
+            Delta = text,
+            Transcript = text,
+            OutputIndex = 0,
+            ContentIndex = 1,
+            Done = false,
+        }, cancellationToken).ConfigureAwait(false);
+
+        await _events.Writer.WriteAsync(new OpenAIRealtimeEvent
+        {
+            Type = "response.output_audio.delta",
+            SessionId = _sessionId,
+            ResponseId = responseId,
+            Delta = ConvertWavBase64ToPcmBase64(wavBase64, targetRate),
+            OutputIndex = 0,
+            ContentIndex = 1,
+            Done = false,
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool TryTakeSpeakableChunk(StringBuilder buffer, bool force, out string text)
+    {
+        text = string.Empty;
+        if (buffer.Length == 0)
+        {
+            return false;
+        }
+
+        var value = buffer.ToString();
+        var cut = -1;
+        for (var i = 0; i < value.Length; i++)
+        {
+            if (IsSentenceBoundary(value[i]))
+            {
+                cut = i + 1;
+                break;
+            }
+        }
+
+        if (cut < 0 && (force || value.Length >= 24))
+        {
+            cut = value.Length;
+        }
+
+        if (cut <= 0)
+        {
+            return false;
+        }
+
+        text = value[..cut].Trim();
+        buffer.Remove(0, cut);
+        return !string.IsNullOrWhiteSpace(text);
+    }
+
+    private static bool IsSentenceBoundary(char ch)
+        => ch is '。' or '！' or '？' or '；' or '，' or '.' or '!' or '?' or ';' or ',';
 
     private void CancelActiveGeneration()
     {
