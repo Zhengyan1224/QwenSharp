@@ -566,7 +566,9 @@ public sealed class Qwen25OmniDigitalHumanRealtimeSession : IOpenAIRealtimeSessi
         var builder = new StringBuilder();
         foreach (var part in parts)
         {
-            if (string.Equals(part.Type, "text", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(part.Text))
+            if ((string.Equals(part.Type, "text", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(part.Type, "input_text", StringComparison.OrdinalIgnoreCase))
+                && !string.IsNullOrWhiteSpace(part.Text))
             {
                 builder.Append(part.Text);
             }
